@@ -35,9 +35,9 @@ FUNC_QUERIES = {
     ".tsx": "[(function_declaration) @func (arrow_function) @func (method_definition) @func]",
     ".jsx": "[(function_declaration) @func (arrow_function) @func (method_definition) @func]",
     ".c": "(function_definition) @func",
-    ".h": "[(function_definition) @func (declaration) @func]",
+    ".h": "(function_definition) @func",
     ".cpp": "(function_definition) @func",
-    ".hpp": "[(function_definition) @func (declaration) @func]",
+    ".hpp": "(function_definition) @func",
     ".cc": "(function_definition) @func",
     ".cxx": "(function_definition) @func",
 }

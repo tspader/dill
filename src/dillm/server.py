@@ -52,22 +52,12 @@ async def search(request: Request, q: str = ""):
             "results.html", {"request": request, "results": [], "query": q}
         )
     db = get_db()
-    results = db.search(q, limit=5)
+    if q.strip() == "*":
+        results = db.get_all()
+    else:
+        results = db.search(q, limit=5)
     return templates.TemplateResponse(
         "results.html", {"request": request, "results": results, "query": q}
-    )
-
-
-class IngestForm(BaseModel):
-    q: str
-
-
-@app.post("/api/ingest", response_class=HTMLResponse)
-async def ingest(request: Request, form: IngestForm):
-    db = get_db()
-    doc_id = db.ingest(form.q)
-    return templates.TemplateResponse(
-        "results.html", {"request": request, "ingested": doc_id}
     )
 
 

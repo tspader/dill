@@ -127,3 +127,29 @@ def ingest_file(filepath: str) -> list[str]:
         )
         ids.append(doc_id)
     return ids
+
+
+def get_all() -> list[dict]:
+    collection = get_collection()
+    count = collection.count()
+    if count == 0:
+        return []
+    results = collection.get(include=["documents", "metadatas"])
+    out = []
+    for i, doc_id in enumerate(results["ids"]):
+        content = results["documents"][i]
+        metadata = results["metadatas"][i] if results["metadatas"] else {}
+        snippet = content[:200] + "..." if len(content) > 200 else content
+        out.append(
+            {
+                "id": doc_id,
+                "content": content,
+                "snippet": snippet,
+                "distance": 0,
+                "similarity": 1.0,
+                "filename": metadata.get("filename", ""),
+                "start_line": metadata.get("start_line"),
+                "end_line": metadata.get("end_line"),
+            }
+        )
+    return out

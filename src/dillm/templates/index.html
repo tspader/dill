@@ -79,14 +79,10 @@
         button:hover {
             background: #3a3a3a;
         }
-        .file-row {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 0.5rem;
-            align-items: center;
+        .file-form {
+            display: inline-block;
         }
         input[type="file"] {
-            flex: 1;
             font-size: 0.9rem;
             color: #e0e0e0;
         }
@@ -97,7 +93,6 @@
             border-radius: 4px;
             color: #e0e0e0;
             cursor: pointer;
-            margin-right: 0.5rem;
         }
         input[type="file"]::file-selector-button:hover {
             background: #3a3a3a;
@@ -142,22 +137,16 @@
                         type="text"
                         id="query"
                         name="q"
-                        placeholder="search or ingest..."
+                        placeholder="search (* for all)..."
                         autocomplete="off"
                         hx-get="/api/search"
                         hx-trigger="keyup changed delay:100ms"
                         hx-target="#results"
                     >
-                    <button
-                        hx-post="/api/ingest"
-                        hx-include="#query"
-                        hx-target="#results"
-                    >ingest</button>
+                    <form class="file-form" hx-post="/api/ingest_file" hx-target="#results" hx-encoding="multipart/form-data">
+                        <input type="file" name="file" id="file-input" hx-trigger="change" hx-post="/api/ingest_file" hx-encoding="multipart/form-data">
+                    </form>
                 </div>
-                <form class="file-row" hx-post="/api/ingest_file" hx-target="#results" hx-encoding="multipart/form-data">
-                    <input type="file" name="file" id="file-input">
-                    <button type="submit">ingest file</button>
-                </form>
             </div>
 
             <div class="loading">Searching...</div>
