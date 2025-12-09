@@ -1,0 +1,67 @@
+<style>
+    .result {
+        background: #1a1a1a;
+        border: 1px solid #2a2a2a;
+        border-radius: 4px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        cursor: pointer;
+    }
+    .result:hover {
+        border-color: #444;
+    }
+    .result-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 0.5rem;
+    }
+    .result-id {
+        font-family: 'SF Mono', Monaco, monospace;
+        font-size: 0.85rem;
+        color: #888;
+    }
+    .result-score {
+        font-size: 0.8rem;
+        color: #6a6;
+    }
+    .result-snippet {
+        color: #ccc;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+    }
+    .no-results {
+        text-align: center;
+        color: #666;
+        padding: 3rem 1rem;
+    }
+    .ingest-success {
+        background: #1a2a1a;
+        border: 1px solid #2a4a2a;
+        border-radius: 4px;
+        padding: 1rem;
+        color: #6a6;
+    }
+</style>
+
+{% if ingested %}
+<div class="ingest-success">
+    Ingested: {{ ingested }}
+</div>
+{% elif results %}
+    {% for result in results %}
+    <div class="result" data-id="{{ result.id }}" data-content="{{ result.content | e }}" onclick="showDocument(this.dataset.id, this.dataset.content)">
+        <div class="result-header">
+            <span class="result-id">{{ result.id[:12] }}...</span>
+            <span class="result-score">{{ "%.2f"|format(result.similarity * 100) }}%</span>
+        </div>
+        <div class="result-snippet">{{ result.snippet }}</div>
+    </div>
+    {% endfor %}
+{% elif query %}
+    <div class="no-results">No results for "{{ query }}"</div>
+{% endif %}
