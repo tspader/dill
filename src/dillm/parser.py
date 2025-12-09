@@ -43,7 +43,9 @@ FUNC_QUERIES = {
 }
 
 
-def extract_functions(filepath: str) -> list[dict]:
+def extract_functions(
+    filepath: str, original_filename: str | None = None
+) -> list[dict]:
     path = Path(filepath)
     ext = path.suffix.lower()
 
@@ -61,6 +63,8 @@ def extract_functions(filepath: str) -> list[dict]:
     query = Query(lang, query_str)
     cursor = QueryCursor(query)
 
+    filename = original_filename or path.name
+
     functions = []
     for _, captures in cursor.matches(tree.root_node):
         for name, nodes in captures.items():
@@ -74,7 +78,7 @@ def extract_functions(filepath: str) -> list[dict]:
                         "start_line": start_line,
                         "end_line": end_line,
                         "filepath": str(path),
-                        "filename": path.name,
+                        "filename": filename,
                     }
                 )
 

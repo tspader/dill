@@ -57,7 +57,7 @@ def get_client():
 
 def get_collection():
     client = get_client()
-    return client.get_or_create_collection(name="documents")
+    return client.get_or_create_collection(name="documents", metadata={"hnsw:space": "cosine"})
 
 
 def ingest(content: str) -> str:
@@ -100,10 +100,10 @@ def search(query: str, limit: int = 5) -> list[dict]:
     return out
 
 
-def ingest_file(filepath: str) -> list[str]:
+def ingest_file(filepath: str, original_filename: str | None = None) -> list[str]:
     from dillm.parser import extract_functions
 
-    functions = extract_functions(filepath)
+    functions = extract_functions(filepath, original_filename)
     if not functions:
         return []
 

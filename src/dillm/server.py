@@ -64,20 +64,21 @@ async def search(request: Request, q: str = ""):
 @app.post("/api/ingest_file", response_class=HTMLResponse)
 async def ingest_file(request: Request, file: UploadFile = File(...)):
     db = get_db()
-    suffix = Path(file.filename).suffix
+    original_filename = file.filename or "unknown"
+    suffix = Path(original_filename).suffix
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
     try:
-        ids = db.ingest_file(tmp_path)
+        ids = db.ingest_file(tmp_path, original_filename)
     finally:
         Path(tmp_path).unlink(missing_ok=True)
     return templates.TemplateResponse(
         "results.html",
         {
             "request": request,
-            "ingested_file": file.filename,
+            "ingested_file": original_filename,
             "ingested_count": len(ids),
         },
     )
