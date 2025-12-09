@@ -76,12 +76,13 @@ def search(query: str, limit: int = 5) -> list[dict]:
     results = collection.query(
         query_embeddings=[embedding],
         n_results=limit,
-        include=["documents", "distances"],
+        include=["documents", "distances", "metadatas"],
     )
     out = []
     for i, doc_id in enumerate(results["ids"][0]):
         distance = results["distances"][0][i]
         content = results["documents"][0][i]
+        metadata = results["metadatas"][0][i] if results["metadatas"] else {}
         similarity = 1 / (1 + distance)
         snippet = content[:200] + "..." if len(content) > 200 else content
         out.append(
@@ -91,6 +92,38 @@ def search(query: str, limit: int = 5) -> list[dict]:
                 "snippet": snippet,
                 "distance": distance,
                 "similarity": similarity,
+                "filename": metadata.get("filename", ""),
+                "start_line": metadata.get("start_line"),
+                "end_line": metadata.get("end_line"),
             }
         )
     return out
+
+
+def ingest_file(filepath: str) -> list[str]:
+    from dillm.parser import extract_functions
+
+    functions = extract_functions(filepath)
+    if not functions:
+        return []
+
+    collection = get_collection()
+    ids = []
+    for func in functions:
+        embedding = embed(func["text"])
+        doc_id = str(uuid.uuid4())
+        collection.add(
+            ids=[doc_id],
+            embeddings=[embedding],
+            documents=[func["text"]],
+            metadatas=[
+                {
+                    "filename": func["filename"],
+                    "filepath": func["filepath"],
+                    "start_line": func["start_line"],
+                    "end_line": func["end_line"],
+                }
+            ],
+        )
+        ids.append(doc_id)
+    return ids

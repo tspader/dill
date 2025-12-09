@@ -21,6 +21,11 @@
         font-size: 0.85rem;
         color: #888;
     }
+    .result-file {
+        font-family: 'SF Mono', Monaco, monospace;
+        font-size: 0.8rem;
+        color: #68a;
+    }
     .result-score {
         font-size: 0.8rem;
         color: #6a6;
@@ -52,11 +57,19 @@
 <div class="ingest-success">
     Ingested: {{ ingested }}
 </div>
+{% elif ingested_file %}
+<div class="ingest-success">
+    Ingested {{ ingested_count }} functions from {{ ingested_file }}
+</div>
 {% elif results %}
     {% for result in results %}
     <div class="result" data-id="{{ result.id }}" data-content="{{ result.content | e }}" onclick="showDocument(this.dataset.id, this.dataset.content)">
         <div class="result-header">
+            {% if result.filename %}
+            <span class="result-file">{{ result.filename }}:{{ result.start_line }}-{{ result.end_line }}</span>
+            {% else %}
             <span class="result-id">{{ result.id[:12] }}...</span>
+            {% endif %}
             <span class="result-score">{{ "%.2f"|format(result.similarity * 100) }}%</span>
         </div>
         <div class="result-snippet">{{ result.snippet }}</div>

@@ -79,6 +79,29 @@
         button:hover {
             background: #3a3a3a;
         }
+        .file-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            align-items: center;
+        }
+        input[type="file"] {
+            flex: 1;
+            font-size: 0.9rem;
+            color: #e0e0e0;
+        }
+        input[type="file"]::file-selector-button {
+            padding: 0.5rem 1rem;
+            background: #2a2a2a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #e0e0e0;
+            cursor: pointer;
+            margin-right: 0.5rem;
+        }
+        input[type="file"]::file-selector-button:hover {
+            background: #3a3a3a;
+        }
         .loading {
             text-align: center;
             padding: 2rem;
@@ -131,6 +154,10 @@
                         hx-target="#results"
                     >ingest</button>
                 </div>
+                <form class="file-row" hx-post="/api/ingest_file" hx-target="#results" hx-encoding="multipart/form-data">
+                    <input type="file" name="file" id="file-input">
+                    <button type="submit">ingest file</button>
+                </form>
             </div>
 
             <div class="loading">Searching...</div>

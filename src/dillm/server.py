@@ -1,8 +1,9 @@
+import tempfile
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -67,4 +68,26 @@ async def ingest(request: Request, form: IngestForm):
     doc_id = db.ingest(form.q)
     return templates.TemplateResponse(
         "results.html", {"request": request, "ingested": doc_id}
+    )
+
+
+@app.post("/api/ingest_file", response_class=HTMLResponse)
+async def ingest_file(request: Request, file: UploadFile = File(...)):
+    db = get_db()
+    suffix = Path(file.filename).suffix
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+    try:
+        ids = db.ingest_file(tmp_path)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+    return templates.TemplateResponse(
+        "results.html",
+        {
+            "request": request,
+            "ingested_file": file.filename,
+            "ingested_count": len(ids),
+        },
     )
