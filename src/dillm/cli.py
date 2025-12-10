@@ -12,22 +12,43 @@ def cli():
 
 @cli.command()
 @click.argument("symbol")
-@click.option("--project", "-p", default="default", help="Project name")
-@click.option("--version", "-v", default="0.0.0", help="Version string")
+@click.option("--project", "-p", default=None, help="Filter by project")
+@click.option("--version", "-v", default=None, help="Filter by version")
 def find(symbol, project, version):
     """Look up a symbol by exact name."""
     import dillm
+    from rich.console import Console
+    from rich.syntax import Syntax
+    from rich.text import Text
 
     results = dillm.find_symbol(symbol, project=project, version=version)
+    console = Console()
     if not results:
-        print(f"No results for '{symbol}'")
+        console.print(f"No results for '{symbol}'", style="dim")
         return
-    for r in results:
-        print(
-            f"--- {r['symbol_name']} ({r['symbol_type']}) @ {r['filename']}:{r['start_line']}-{r['end_line']}"
-        )
-        print(r["content"])
-        print()
+
+    for i, r in enumerate(results):
+        sym_name = r.get("symbol_name", "unknown")
+        sym_type = r.get("symbol_type", "")
+        filename = r.get("filename", "")
+        start = r.get("start_line", "?")
+        end = r.get("end_line", "?")
+        content = r.get("content", "")
+
+        header = Text()
+        if sym_type == "func":
+            header.append(sym_name, style="bright_cyan bold")
+        else:
+            header.append(sym_name, style="bright_yellow bold")
+        header.append(f" ({sym_type}) ", style="dim")
+        header.append(f"{filename}:{start}-{end}", style="bright_black")
+        console.print(header)
+
+        syntax = Syntax(content, "c", theme="ansi_dark", background_color="default")
+        console.print(syntax)
+
+        if i < len(results) - 1:
+            console.print()
 
 
 @cli.command()

@@ -133,21 +133,24 @@ def search(
 
 def search_by_symbol(
     symbol_name: str,
-    project: str = "default",
-    version: str = "0.0.0",
+    project: str | None = None,
+    version: str | None = None,
 ) -> list[dict]:
-    """Look up symbols by exact name within a project/version."""
+    """Look up symbols by exact name, optionally filtered by project/version."""
     collection = get_collection()
     if collection.count() == 0:
         return []
 
-    where = {
-        "$and": [
-            {"symbol_name": symbol_name},
-            {"project": project},
-            {"version": version},
-        ]
-    }
+    conditions = [{"symbol_name": symbol_name}]
+    if project is not None:
+        conditions.append({"project": project})
+    if version is not None:
+        conditions.append({"version": version})
+
+    if len(conditions) == 1:
+        where = conditions[0]
+    else:
+        where = {"$and": conditions}
 
     results = collection.get(
         where=where,

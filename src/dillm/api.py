@@ -13,10 +13,10 @@ from pathlib import Path
 
 def find_symbol(
     name: str,
-    project: str = "default",
-    version: str = "0.0.0",
+    project: str | None = None,
+    version: str | None = None,
 ) -> list[dict]:
-    """Look up a symbol by exact name within project/version."""
+    """Look up a symbol by exact name, optionally filtered by project/version."""
     from dillm import db
     return db.search_by_symbol(name, project=project, version=version)
 
