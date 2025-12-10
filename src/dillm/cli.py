@@ -39,6 +39,9 @@ def find(symbol, project, version):
 def match(text, filepath, project, version, limit):
     """Similarity search against stored embeddings."""
     import dillm
+    from rich.console import Console
+    from rich.syntax import Syntax
+    from rich.text import Text
 
     if text is None and filepath is None:
         raise click.UsageError("Must provide --text or --file")
@@ -52,18 +55,37 @@ def match(text, filepath, project, version, limit):
     else:
         results = dillm.match(text, project=project, version=version, limit=limit)
 
+    console = Console()
     if not results:
-        print("No results")
+        console.print("No results", style="dim")
         return
-    for r in results:
-        sym_name = r.get("symbol_name", "")
+
+    for i, r in enumerate(results):
+        sym_name = r.get("symbol_name", "unknown")
         sym_type = r.get("symbol_type", "")
-        label = f"{sym_name} ({sym_type})" if sym_name else "unknown"
-        print(
-            f"--- {label} @ {r['filename']}:{r.get('start_line', '?')}-{r.get('end_line', '?')} [sim={r['similarity']:.3f}]"
-        )
-        print(r.get("snippet", r.get("content", "")[:200]))
-        print()
+        filename = r.get("filename", "")
+        start = r.get("start_line", "?")
+        end = r.get("end_line", "?")
+        similarity = r.get("similarity", 0)
+        content = r.get("content", "")
+
+        # Header line
+        header = Text()
+        if sym_type == "func":
+            header.append(sym_name, style="bright_cyan bold")
+        else:
+            header.append(sym_name, style="bright_yellow bold")
+        header.append(f" ({sym_type}) ", style="dim")
+        header.append(f"{filename}:{start}-{end}", style="bright_black")
+        header.append(f" [{similarity:.1%}]", style="green")
+        console.print(header)
+
+        # Syntax highlighted code
+        syntax = Syntax(content, "c", theme="ansi_dark", background_color="default")
+        console.print(syntax)
+
+        if i < len(results) - 1:
+            console.print()
 
 
 @cli.command()
