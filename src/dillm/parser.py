@@ -16,72 +16,48 @@ LANG_MAP = {
     ".cxx": CPP_LANGUAGE,
 }
 
-# Queries for functions, structs, and classes
+# Queries capture both the symbol node and its name directly
+C_QUERY = """
+(function_definition
+  declarator: (function_declarator
+    declarator: (identifier) @name)) @func
+
+(struct_specifier
+  name: (type_identifier) @name
+  body: (_)) @struct
+"""
+
+CPP_QUERY = """
+(function_definition
+  declarator: (function_declarator
+    declarator: (identifier) @name)) @func
+
+(function_definition
+  declarator: (function_declarator
+    declarator: (field_identifier) @name)) @func
+
+(function_definition
+  declarator: (function_declarator
+    declarator: (qualified_identifier
+      name: (identifier) @name))) @func
+
+(struct_specifier
+  name: (type_identifier) @name
+  body: (_)) @struct
+
+(class_specifier
+  name: (type_identifier) @name
+  body: (_)) @class
+"""
+
 SYMBOL_QUERIES = {
-    ".c": """[
-        (function_definition) @func
-        (struct_specifier name: (type_identifier) @_name body: (_)) @struct
-    ]""",
-    ".h": """[
-        (function_definition) @func
-        (struct_specifier name: (type_identifier) @_name body: (_)) @struct
-        (class_specifier name: (type_identifier) @_name body: (_)) @class
-    ]""",
-    ".cpp": """[
-        (function_definition) @func
-        (struct_specifier name: (type_identifier) @_name body: (_)) @struct
-        (class_specifier name: (type_identifier) @_name body: (_)) @class
-    ]""",
-    ".hpp": """[
-        (function_definition) @func
-        (struct_specifier name: (type_identifier) @_name body: (_)) @struct
-        (class_specifier name: (type_identifier) @_name body: (_)) @class
-    ]""",
-    ".cc": """[
-        (function_definition) @func
-        (struct_specifier name: (type_identifier) @_name body: (_)) @struct
-        (class_specifier name: (type_identifier) @_name body: (_)) @class
-    ]""",
-    ".cxx": """[
-        (function_definition) @func
-        (struct_specifier name: (type_identifier) @_name body: (_)) @struct
-        (class_specifier name: (type_identifier) @_name body: (_)) @class
-    ]""",
+    ".c": C_QUERY,
+    ".h": CPP_QUERY,
+    ".cpp": CPP_QUERY,
+    ".hpp": CPP_QUERY,
+    ".cc": CPP_QUERY,
+    ".cxx": CPP_QUERY,
 }
-
-
-def _get_symbol_name(node, content: bytes) -> str | None:
-    """Extract symbol name from a function, struct, or class node."""
-    node_type = node.type
-
-    if node_type == "function_definition":
-        # For functions: look for declarator -> (function_declarator -> declarator) or direct identifier
-        declarator = node.child_by_field_name("declarator")
-        while declarator:
-            if declarator.type == "function_declarator":
-                inner = declarator.child_by_field_name("declarator")
-                if inner:
-                    if inner.type == "identifier":
-                        return content[inner.start_byte : inner.end_byte].decode()
-                    # Handle qualified names like ClassName::method
-                    if inner.type == "qualified_identifier":
-                        name_node = inner.child_by_field_name("name")
-                        if name_node:
-                            return content[
-                                name_node.start_byte : name_node.end_byte
-                            ].decode()
-                break
-            elif declarator.type == "identifier":
-                return content[declarator.start_byte : declarator.end_byte].decode()
-            declarator = declarator.child_by_field_name("declarator")
-
-    elif node_type in ("struct_specifier", "class_specifier"):
-        # For structs/classes: look for name field
-        name_node = node.child_by_field_name("name")
-        if name_node:
-            return content[name_node.start_byte : name_node.end_byte].decode()
-
-    return None
 
 
 def extract_symbols(filepath: str, original_filename: str | None = None) -> list[dict]:
@@ -107,43 +83,47 @@ def extract_symbols(filepath: str, original_filename: str | None = None) -> list
     filename = original_filename or path.name
 
     symbols = []
-    seen_nodes = set()  # Avoid duplicates from multiple capture names
+    seen_nodes = set()
 
     for _, captures in cursor.matches(tree.root_node):
+        # Each match has @name and one of @func/@struct/@class
+        name_node = None
+        symbol_node = None
+        symbol_type = None
+
         for capture_name, nodes in captures.items():
-            if capture_name.startswith("_"):  # Skip helper captures like @_name
-                continue
             for node in nodes:
-                node_id = (node.start_byte, node.end_byte)
-                if node_id in seen_nodes:
-                    continue
-                seen_nodes.add(node_id)
+                if capture_name == "name":
+                    name_node = node
+                else:
+                    symbol_node = node
+                    symbol_type = capture_name
 
-                symbol_name = _get_symbol_name(node, content_bytes)
-                if not symbol_name:
-                    continue
+        if not name_node or not symbol_node:
+            continue
 
-                symbol_text = content[node.start_byte : node.end_byte]
-                start_line = node.start_point[0] + 1
-                end_line = node.end_point[0] + 1
+        node_id = (symbol_node.start_byte, symbol_node.end_byte)
+        if node_id in seen_nodes:
+            continue
+        seen_nodes.add(node_id)
 
-                symbols.append(
-                    {
-                        "text": symbol_text,
-                        "symbol_name": symbol_name,
-                        "symbol_type": capture_name,  # "func", "struct", or "class"
-                        "start_line": start_line,
-                        "end_line": end_line,
-                        "filepath": str(path),
-                        "filename": filename,
-                    }
-                )
+        symbol_name = content_bytes[name_node.start_byte:name_node.end_byte].decode()
+        symbol_text = content[symbol_node.start_byte:symbol_node.end_byte]
+        start_line = symbol_node.start_point[0] + 1
+        end_line = symbol_node.end_point[0] + 1
+
+        symbols.append({
+            "text": symbol_text,
+            "symbol_name": symbol_name,
+            "symbol_type": symbol_type,
+            "start_line": start_line,
+            "end_line": end_line,
+            "filepath": str(path),
+            "filename": filename,
+        })
 
     return symbols
 
 
 # Keep old name for compatibility
-def extract_functions(
-    filepath: str, original_filename: str | None = None
-) -> list[dict]:
-    return extract_symbols(filepath, original_filename)
+extract_functions = extract_symbols
