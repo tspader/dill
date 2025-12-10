@@ -83,12 +83,22 @@ def ingest(filepath, project, version):
 @click.option("--version", "-v", default=None, help="Filter by version")
 def list_symbols(project, version):
     """List all symbols in the store."""
+    from rich.console import Console
+    from rich.table import Table
     from dillm import db
 
     results = db.list_symbols(project=project, version=version)
     if not results:
         print("No symbols found")
         return
+
+    table = Table()
+    table.add_column("Symbol", style="bold")
+    table.add_column("Type")
+    table.add_column("Project@Version")
+    table.add_column("File")
+    table.add_column("Lines")
+
     for r in results:
         sym_name = r.get("symbol_name", "unknown")
         sym_type = r.get("symbol_type", "")
@@ -97,7 +107,15 @@ def list_symbols(project, version):
         filename = r.get("filename", "")
         start = r.get("start_line", "?")
         end = r.get("end_line", "?")
-        print(f"{sym_name} ({sym_type}) [{proj}@{ver}] {filename}:{start}-{end}")
+
+        if sym_type == "func":
+            name_styled = f"[bright_cyan]{sym_name}[/bright_cyan]"
+        else:  # struct, class
+            name_styled = f"[bright_yellow]{sym_name}[/bright_yellow]"
+
+        table.add_row(name_styled, sym_type, f"{proj}@{ver}", filename, f"{start}-{end}")
+
+    Console().print(table)
 
 
 @cli.command()
