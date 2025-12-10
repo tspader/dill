@@ -2,10 +2,6 @@ import logging
 import uuid
 from pathlib import Path
 
-import chromadb
-import torch
-from transformers import AutoModel, AutoTokenizer
-
 logger = logging.getLogger(__name__)
 
 STORE_PATH = Path("./store")
@@ -14,11 +10,21 @@ MODEL_NAME = "microsoft/unixcoder-base"
 _model = None
 _tokenizer = None
 _device = None
+_torch = None
+
+
+def _get_torch():
+    global _torch
+    if _torch is None:
+        import torch
+        _torch = torch
+    return _torch
 
 
 def get_device():
     global _device
     if _device is None:
+        torch = _get_torch()
         if torch.cuda.is_available():
             _device = torch.device("cuda")
             logger.info("Using CUDA")
@@ -31,6 +37,7 @@ def get_device():
 def get_model():
     global _model, _tokenizer
     if _model is None:
+        from transformers import AutoModel, AutoTokenizer
         device = get_device()
         _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
         _model = AutoModel.from_pretrained(MODEL_NAME)
@@ -40,6 +47,7 @@ def get_model():
 
 
 def embed(text: str) -> list[float]:
+    torch = _get_torch()
     model, tokenizer = get_model()
     device = get_device()
     inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
@@ -51,13 +59,16 @@ def embed(text: str) -> list[float]:
 
 
 def get_client():
+    import chromadb
     STORE_PATH.mkdir(parents=True, exist_ok=True)
     return chromadb.PersistentClient(path=str(STORE_PATH))
 
 
 def get_collection():
     client = get_client()
-    return client.get_or_create_collection(name="documents", metadata={"hnsw:space": "cosine"})
+    return client.get_or_create_collection(
+        name="documents", metadata={"hnsw:space": "cosine"}
+    )
 
 
 def ingest(content: str) -> str:
@@ -68,15 +79,31 @@ def ingest(content: str) -> str:
     return doc_id
 
 
-def search(query: str, limit: int = 5) -> list[dict]:
+def search(
+    query: str,
+    limit: int = 5,
+    project: str | None = None,
+    version: str | None = None,
+) -> list[dict]:
     collection = get_collection()
     if collection.count() == 0:
         return []
+
+    # Build where filter for project/version if provided
+    where = None
+    if project is not None and version is not None:
+        where = {"$and": [{"project": project}, {"version": version}]}
+    elif project is not None:
+        where = {"project": project}
+    elif version is not None:
+        where = {"version": version}
+
     embedding = embed(query)
     results = collection.query(
         query_embeddings=[embedding],
         n_results=limit,
         include=["documents", "distances", "metadatas"],
+        where=where,
     )
     out = []
     for i, doc_id in enumerate(results["ids"][0]):
@@ -95,38 +122,134 @@ def search(query: str, limit: int = 5) -> list[dict]:
                 "filename": metadata.get("filename", ""),
                 "start_line": metadata.get("start_line"),
                 "end_line": metadata.get("end_line"),
+                "symbol_name": metadata.get("symbol_name", ""),
+                "symbol_type": metadata.get("symbol_type", ""),
+                "project": metadata.get("project", ""),
+                "version": metadata.get("version", ""),
             }
         )
     return out
 
 
-def ingest_file(filepath: str, original_filename: str | None = None) -> list[str]:
-    from dillm.parser import extract_functions
+def search_by_symbol(
+    symbol_name: str,
+    project: str = "default",
+    version: str = "0.0.0",
+) -> list[dict]:
+    """Look up symbols by exact name within a project/version."""
+    collection = get_collection()
+    if collection.count() == 0:
+        return []
 
-    functions = extract_functions(filepath, original_filename)
-    if not functions:
+    where = {
+        "$and": [
+            {"symbol_name": symbol_name},
+            {"project": project},
+            {"version": version},
+        ]
+    }
+
+    results = collection.get(
+        where=where,
+        include=["documents", "metadatas"],
+    )
+
+    out = []
+    for i, doc_id in enumerate(results["ids"]):
+        content = results["documents"][i]
+        metadata = results["metadatas"][i] if results["metadatas"] else {}
+        out.append(
+            {
+                "id": doc_id,
+                "content": content,
+                "filename": metadata.get("filename", ""),
+                "filepath": metadata.get("filepath", ""),
+                "start_line": metadata.get("start_line"),
+                "end_line": metadata.get("end_line"),
+                "symbol_name": metadata.get("symbol_name", ""),
+                "symbol_type": metadata.get("symbol_type", ""),
+                "project": metadata.get("project", ""),
+                "version": metadata.get("version", ""),
+            }
+        )
+    return out
+
+
+def ingest_file(
+    filepath: str,
+    original_filename: str | None = None,
+    project: str = "default",
+    version: str = "0.0.0",
+) -> list[str]:
+    from dillm.parser import extract_symbols
+
+    symbols = extract_symbols(filepath, original_filename)
+    if not symbols:
         return []
 
     collection = get_collection()
     ids = []
-    for func in functions:
-        embedding = embed(func["text"])
+    for sym in symbols:
+        embedding = embed(sym["text"])
         doc_id = str(uuid.uuid4())
         collection.add(
             ids=[doc_id],
             embeddings=[embedding],
-            documents=[func["text"]],
+            documents=[sym["text"]],
             metadatas=[
                 {
-                    "filename": func["filename"],
-                    "filepath": func["filepath"],
-                    "start_line": func["start_line"],
-                    "end_line": func["end_line"],
+                    "filename": sym["filename"],
+                    "filepath": sym["filepath"],
+                    "start_line": sym["start_line"],
+                    "end_line": sym["end_line"],
+                    "symbol_name": sym["symbol_name"],
+                    "symbol_type": sym["symbol_type"],
+                    "project": project,
+                    "version": version,
                 }
             ],
         )
         ids.append(doc_id)
     return ids
+
+
+def list_symbols(
+    project: str | None = None,
+    version: str | None = None,
+) -> list[dict]:
+    """List all symbols, optionally filtered by project/version."""
+    collection = get_collection()
+    if collection.count() == 0:
+        return []
+
+    where = None
+    if project is not None and version is not None:
+        where = {"$and": [{"project": project}, {"version": version}]}
+    elif project is not None:
+        where = {"project": project}
+    elif version is not None:
+        where = {"version": version}
+
+    results = collection.get(where=where, include=["documents", "metadatas"])
+    out = []
+    for i, doc_id in enumerate(results["ids"]):
+        content = results["documents"][i]
+        metadata = results["metadatas"][i] if results["metadatas"] else {}
+        out.append(
+            {
+                "id": doc_id,
+                "content": content,
+                "filename": metadata.get("filename", ""),
+                "filepath": metadata.get("filepath", ""),
+                "start_line": metadata.get("start_line"),
+                "end_line": metadata.get("end_line"),
+                "symbol_name": metadata.get("symbol_name", ""),
+                "symbol_type": metadata.get("symbol_type", ""),
+                "project": metadata.get("project", ""),
+                "version": metadata.get("version", ""),
+            }
+        )
+    return out
 
 
 def get_all() -> list[dict]:
