@@ -85,7 +85,7 @@ async def ingest_file(
         tmp.write(content)
         tmp_path = tmp.name
     try:
-        ids = db.ingest_file(
+        ids, duplicates = db.ingest_file(
             tmp_path, original_filename, project=project, version=version
         )
     finally:
@@ -96,5 +96,6 @@ async def ingest_file(
             "request": request,
             "ingested_file": original_filename,
             "ingested_count": len(ids),
+            "duplicates": duplicates,
         },
     )

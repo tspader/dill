@@ -74,8 +74,11 @@ def ingest(filepath, project, version):
     """Ingest a C/C++ file into the store."""
     from dillm import db
 
-    ids = db.ingest_file(filepath, project=project, version=version)
+    ids, duplicates = db.ingest_file(filepath, project=project, version=version)
     print(f"Ingested {len(ids)} symbols from {filepath}")
+    if duplicates:
+        for name, count in duplicates.items():
+            print(f"  duplicate: {name} ({count} skipped)")
 
 
 @cli.command("list")
@@ -93,11 +96,13 @@ def list_symbols(project, version):
         return
 
     table = Table()
-    table.add_column("Symbol", style="bold")
-    table.add_column("Type")
-    table.add_column("Project@Version")
-    table.add_column("File")
-    table.add_column("Lines")
+    table.add_column("Symbol", header_style="bright_black")
+    table.add_column("Type", header_style="bright_black")
+    table.add_column("Project", header_style="bright_black")
+    table.add_column("Version", header_style="bright_black")
+    table.add_column("File", header_style="bright_black")
+    table.add_column("Lines", header_style="bright_black")
+    table.add_column("Chars", header_style="bright_black")
 
     for r in results:
         sym_name = r.get("symbol_name", "unknown")
@@ -107,13 +112,16 @@ def list_symbols(project, version):
         filename = r.get("filename", "")
         start = r.get("start_line", "?")
         end = r.get("end_line", "?")
+        content = r.get("content", "")
 
         if sym_type == "func":
             name_styled = f"[bright_cyan]{sym_name}[/bright_cyan]"
         else:  # struct, class
             name_styled = f"[bright_yellow]{sym_name}[/bright_yellow]"
 
-        table.add_row(name_styled, sym_type, f"{proj}@{ver}", filename, f"{start}-{end}")
+        table.add_row(
+            name_styled, sym_type, proj, ver, filename, f"{start}-{end}", str(len(content))
+        )
 
     Console().print(table)
 

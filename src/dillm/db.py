@@ -180,16 +180,30 @@ def ingest_file(
     original_filename: str | None = None,
     project: str = "default",
     version: str = "0.0.0",
-) -> list[str]:
+) -> tuple[list[str], dict[str, int]]:
+    """Ingest symbols from a file.
+    
+    Returns:
+        Tuple of (list of ingested IDs, dict of duplicate symbol names -> count)
+    """
     from dillm.parser import extract_symbols
 
     symbols = extract_symbols(filepath, original_filename)
     if not symbols:
-        return []
+        return [], {}
 
     collection = get_collection()
     ids = []
+    seen: dict[str, int] = {}
+    duplicates: dict[str, int] = {}
+
     for sym in symbols:
+        name = sym["symbol_name"]
+        if name in seen:
+            duplicates[name] = duplicates.get(name, 0) + 1
+            continue
+        seen[name] = 1
+
         embedding = embed(sym["text"])
         doc_id = str(uuid.uuid4())
         collection.add(
@@ -210,7 +224,7 @@ def ingest_file(
             ],
         )
         ids.append(doc_id)
-    return ids
+    return ids, duplicates
 
 
 def list_symbols(
