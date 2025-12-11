@@ -35,18 +35,18 @@ async def root(request: Request):
 @app.get("/api/search/symbol", response_class=HTMLResponse)
 async def search_symbol(
     request: Request,
-    name: str = "",
-    project: str = "default",
-    version: str = "0.0.0",
+    q: str = "",
+    project: str | None = None,
+    version: str | None = None,
 ):
     """Look up a symbol by exact name within project/version."""
-    if not name.strip():
+    if not q.strip():
         return templates.TemplateResponse(
-            "results.html", {"request": request, "results": [], "query": name}
+            "results.html", {"request": request, "results": [], "query": q}
         )
-    results = dillm.find_symbol(name, project=project, version=version)
+    results = dillm.find_symbol(q, project=project, version=version)
     return templates.TemplateResponse(
-        "results.html", {"request": request, "results": results, "query": name}
+        "results.html", {"request": request, "results": results, "query": q}
     )
 
 
@@ -54,6 +54,7 @@ async def search_symbol(
 async def search_similarity(
     request: Request,
     q: str = "",
+    limit: int = 10,
     project: str | None = None,
     version: str | None = None,
 ):
@@ -65,7 +66,7 @@ async def search_similarity(
     if q.strip() == "*":
         results = db.get_all()
     else:
-        results = dillm.match(q, project=project, version=version)
+        results = dillm.match(q, project=project, version=version, limit=limit)
     return templates.TemplateResponse(
         "results.html", {"request": request, "results": results, "query": q}
     )
@@ -97,5 +98,29 @@ async def ingest_file(
             "ingested_file": original_filename,
             "ingested_count": len(ids),
             "duplicates": duplicates,
+        },
+    )
+
+
+@app.post("/api/match_file", response_class=HTMLResponse)
+async def match_file(
+    request: Request,
+    file: UploadFile = File(...),
+    limit: int = Form(10),
+    project: str | None = Form(None),
+    version: str | None = Form(None),
+):
+    """Match uploaded file against stored embeddings."""
+    content = await file.read()
+    text = content.decode("utf-8", errors="replace")
+    results = dillm.match(text, project=project, version=version, limit=limit)
+    return templates.TemplateResponse(
+        "results.html",
+        {
+            "request": request,
+            "results": results,
+            "query": f"file:{file.filename}",
+            "matched_file_content": text,
+            "matched_file_name": file.filename,
         },
     )

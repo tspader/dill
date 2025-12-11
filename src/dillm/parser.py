@@ -108,7 +108,7 @@ def extract_symbols(filepath: str, original_filename: str | None = None) -> list
         seen_nodes.add(node_id)
 
         symbol_name = content_bytes[name_node.start_byte:name_node.end_byte].decode()
-        symbol_text = content[symbol_node.start_byte:symbol_node.end_byte]
+        symbol_text = content_bytes[symbol_node.start_byte:symbol_node.end_byte].decode()
         start_line = symbol_node.start_point[0] + 1
         end_line = symbol_node.end_point[0] + 1
 

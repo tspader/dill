@@ -207,6 +207,19 @@ def ingest_file(
             continue
         seen[name] = 1
 
+        # Check if symbol already exists in DB for this project/version
+        existing = collection.get(
+            where={"$and": [
+                {"symbol_name": name},
+                {"project": project},
+                {"version": version},
+            ]},
+            limit=1,
+        )
+        if existing["ids"]:
+            duplicates[name] = duplicates.get(name, 0) + 1
+            continue
+
         embedding = embed(sym["text"])
         doc_id = str(uuid.uuid4())
         collection.add(

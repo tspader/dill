@@ -5,169 +5,350 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>dill</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/c.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: #0a0a0a;
             color: #e0e0e0;
-            padding: 2rem;
-            line-height: 1.6;
+            height: 100vh;
+            overflow: hidden;
         }
-        .container {
-            max-width: 1600px;
-            margin: 0 auto;
+        .app {
             display: flex;
-            gap: 2rem;
+            height: 100vh;
+            padding: 1rem;
+            gap: 1rem;
         }
-        .left-pane {
-            flex: 0 0 700px;
-        }
-        .right-pane {
+        .panel {
             flex: 1;
-            position: sticky;
-            top: 2rem;
-            height: calc(100vh - 4rem);
-            overflow-y: auto;
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
-            border-radius: 4px;
-            padding: 2rem;
-            display: none;
-        }
-        .right-pane.active {
-            display: block;
-        }
-        h1 {
-            font-size: 1.5rem;
-            margin-bottom: 2rem;
-            color: #fff;
-        }
-        .search-box {
-            position: sticky;
-            top: 0;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
             background: #0a0a0a;
-            padding-bottom: 1rem;
-            z-index: 10;
         }
-        .input-row {
+        .panel-header {
+            padding: 0.75rem;
+            font-size: 0.8rem;
+            color: #666;
+            border-bottom: 1px solid #222;
+            flex-shrink: 0;
+        }
+        .panel-header .title {
+            color: #888;
+        }
+        .panel-body {
+            flex: 1;
+            overflow: auto;
+        }
+        
+        /* Search panel */
+        .search-header {
+            padding: 0.75rem;
+            border-bottom: 1px solid #222;
+        }
+        .search-header h1 {
+            font-size: 1.1rem;
+            margin-bottom: 0.75rem;
+            color: #ccc;
+        }
+        .search-input {
+            width: 100%;
+            padding: 0.5rem 0.6rem;
+            font-size: 0.9rem;
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 3px;
+            color: #e0e0e0;
+            margin-bottom: 0.5rem;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #333;
+        }
+        .search-options {
             display: flex;
             gap: 0.5rem;
+            align-items: center;
         }
-        input[type="text"] {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            font-size: 1rem;
+        .toggle-group {
+            display: flex;
+            border: 1px solid #222;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .toggle-btn {
+            padding: 0.3rem 0.6rem;
+            font-size: 0.75rem;
+            background: #111;
+            border: none;
+            color: #666;
+            cursor: pointer;
+        }
+        .toggle-btn.active {
             background: #1a1a1a;
-            border: 1px solid #333;
-            border-radius: 4px;
-            color: #e0e0e0;
+            color: #aaa;
         }
-        input[type="text"]:focus {
-            outline: none;
-            border-color: #666;
+        .limit-group {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            margin-left: auto;
         }
-        button {
-            padding: 0.75rem 1.5rem;
-            font-size: 1rem;
-            background: #2a2a2a;
-            border: 1px solid #333;
-            border-radius: 4px;
+        .limit-group label {
+            font-size: 0.75rem;
+            color: #555;
+        }
+        .limit-input {
+            width: 45px;
+            padding: 0.3rem;
+            font-size: 0.75rem;
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 3px;
             color: #e0e0e0;
+            text-align: center;
+        }
+        .file-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        .file-btn {
+            flex: 1;
+            padding: 0.4rem;
+            font-size: 0.75rem;
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 3px;
+            color: #666;
+            cursor: pointer;
+            text-align: center;
+            position: relative;
+        }
+        .file-btn:hover {
+            color: #888;
+            border-color: #333;
+        }
+        .file-btn input[type="file"] {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            opacity: 0;
             cursor: pointer;
         }
-        button:hover {
-            background: #3a3a3a;
-        }
-        .file-form {
-            display: inline-block;
-        }
-        input[type="file"] {
-            font-size: 0.9rem;
-            color: #e0e0e0;
-        }
-        input[type="file"]::file-selector-button {
-            padding: 0.5rem 1rem;
-            background: #2a2a2a;
-            border: 1px solid #333;
-            border-radius: 4px;
-            color: #e0e0e0;
-            cursor: pointer;
-        }
-        input[type="file"]::file-selector-button:hover {
-            background: #3a3a3a;
+        
+        .results-list {
+            padding: 0.5rem;
         }
         .loading {
             text-align: center;
             padding: 2rem;
-            color: #666;
+            color: #444;
             display: none;
         }
         .htmx-request .loading {
             display: block;
         }
-        .htmx-request #results {
-            opacity: 0.5;
+        
+        /* Code panels */
+        .code-panel {
+            display: none;
         }
-        #results {
-            margin-top: 1rem;
+        .code-panel.active {
+            display: flex;
         }
-        .right-pane h2 {
-            font-size: 1rem;
-            margin-bottom: 1rem;
-            color: #888;
-            word-break: break-all;
+        .code-body {
+            flex: 1;
+            overflow: auto;
         }
-        .document-content {
-            color: #ccc;
-            white-space: pre-wrap;
-            font-family: 'SF Mono', Monaco, monospace;
-            font-size: 0.9rem;
+        .code-body pre {
+            margin: 0;
+            padding: 0.75rem;
+        }
+        .code-body code {
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+        .code-body .hljs {
+            background: transparent;
+        }
+        
+        .empty-panel {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            font-size: 0.8rem;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="left-pane">
-            <h1>dill</h1>
-
-            <div class="search-box">
-                <div class="input-row">
-                    <input
-                        type="text"
-                        id="query"
-                        name="q"
-                        placeholder="search (* for all)..."
-                        autocomplete="off"
-                        hx-get="/api/search"
-                        hx-trigger="keyup changed delay:100ms"
-                        hx-target="#results"
-                    >
-                    <form class="file-form" hx-post="/api/ingest_file" hx-target="#results" hx-encoding="multipart/form-data">
-                        <input type="file" name="file" id="file-input" hx-trigger="change" hx-post="/api/ingest_file" hx-encoding="multipart/form-data">
-                    </form>
+    <div class="app">
+        <!-- Search panel -->
+        <div class="panel">
+            <div class="search-header">
+                <h1>dill</h1>
+                <input
+                    type="text"
+                    class="search-input"
+                    id="query"
+                    name="q"
+                    placeholder="Search..."
+                    autocomplete="off"
+                    hx-get="/api/search/similarity"
+                    hx-trigger="keyup changed delay:100ms"
+                    hx-target="#results"
+                    hx-include="#limit"
+                >
+                <div class="search-options">
+                    <div class="toggle-group">
+                        <button type="button" class="toggle-btn active" id="mode-similarity" onclick="setMode('similarity')">Similar</button>
+                        <button type="button" class="toggle-btn" id="mode-exact" onclick="setMode('exact')">Exact</button>
+                    </div>
+                    <div class="limit-group">
+                        <label>max</label>
+                        <input type="number" class="limit-input" id="limit" name="limit" value="10" min="1" max="100">
+                    </div>
+                </div>
+                <div class="file-actions">
+                    <label class="file-btn">
+                        Ingest
+                        <input type="file" id="ingest-file" accept=".c,.h,.cpp,.hpp">
+                    </label>
+                    <label class="file-btn">
+                        Match File
+                        <input type="file" id="match-file" accept=".c,.h,.cpp,.hpp">
+                    </label>
                 </div>
             </div>
-
-            <div class="loading">Searching...</div>
-
-            <div id="results"></div>
+            <div class="panel-body results-list">
+                <div class="loading">...</div>
+                <div id="results"></div>
+            </div>
         </div>
 
-        <div class="right-pane" id="document-view">
-            <h2 id="doc-title">Select a result to view</h2>
-            <div class="document-content" id="doc-content"></div>
+        <!-- Matched file panel -->
+        <div class="panel code-panel" id="matched-panel">
+            <div class="panel-header">
+                <span class="title" id="matched-filename"></span>
+            </div>
+            <div class="panel-body code-body">
+                <pre><code class="language-c" id="matched-content"></code></pre>
+            </div>
         </div>
+
+        <!-- Detail panel -->
+        <div class="panel code-panel" id="detail-panel">
+            <div class="panel-header">
+                <span class="title" id="doc-symbol"></span>
+                <span id="doc-location" style="margin-left: 0.5rem; color: #555;"></span>
+            </div>
+            <div class="panel-body code-body">
+                <pre><code class="language-c" id="doc-content"></code></pre>
+            </div>
+        </div>
+
+        <!-- Empty states -->
+        <div class="panel empty-panel" id="empty-matched" style="display: none;"></div>
+        <div class="panel empty-panel" id="empty-detail">select a result</div>
     </div>
 
     <script>
-        function showDocument(id, content) {
-            const pane = document.getElementById('document-view');
-            document.getElementById('doc-title').textContent = id;
-            document.getElementById('doc-content').textContent = content;
-            pane.classList.add('active');
-            pane.scrollTop = 0;
+        function showDocument(symbol, location, content) {
+            document.getElementById('doc-symbol').textContent = symbol || '';
+            document.getElementById('doc-location').textContent = location || '';
+            const codeEl = document.getElementById('doc-content');
+            codeEl.textContent = content;
+            codeEl.removeAttribute('data-highlighted');
+            hljs.highlightElement(codeEl);
+            
+            document.getElementById('detail-panel').classList.add('active');
+            document.getElementById('empty-detail').style.display = 'none';
         }
+        
+        function showMatchedFile(filename, content) {
+            document.getElementById('matched-filename').textContent = filename;
+            const codeEl = document.getElementById('matched-content');
+            codeEl.textContent = content;
+            codeEl.removeAttribute('data-highlighted');
+            hljs.highlightElement(codeEl);
+            document.getElementById('matched-panel').classList.add('active');
+            document.getElementById('empty-matched').style.display = 'none';
+        }
+        
+        function hideMatchedFile() {
+            document.getElementById('matched-panel').classList.remove('active');
+        }
+
+        function setMode(mode) {
+            const query = document.getElementById('query');
+            const simBtn = document.getElementById('mode-similarity');
+            const exactBtn = document.getElementById('mode-exact');
+            
+            if (mode === 'similarity') {
+                query.setAttribute('hx-get', '/api/search/similarity');
+                query.placeholder = 'Search...';
+                simBtn.classList.add('active');
+                exactBtn.classList.remove('active');
+            } else {
+                query.setAttribute('hx-get', '/api/search/symbol');
+                query.placeholder = 'Exact name...';
+                exactBtn.classList.add('active');
+                simBtn.classList.remove('active');
+            }
+            htmx.process(query);
+            hideMatchedFile();
+            if (query.value.trim()) {
+                htmx.trigger(query, 'keyup');
+            }
+        }
+
+        document.getElementById('ingest-file').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            hideMatchedFile();
+            const formData = new FormData();
+            formData.append('file', file);
+            const results = document.getElementById('results');
+            results.style.opacity = '0.5';
+            const response = await fetch('/api/ingest_file', { method: 'POST', body: formData });
+            results.innerHTML = await response.text();
+            results.style.opacity = '1';
+            e.target.value = '';
+        });
+
+        document.getElementById('match-file').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const limit = document.getElementById('limit').value;
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('limit', limit);
+            const results = document.getElementById('results');
+            results.style.opacity = '0.5';
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                showMatchedFile(file.name, evt.target.result);
+            };
+            reader.readAsText(file);
+            const response = await fetch('/api/match_file', { method: 'POST', body: formData });
+            results.innerHTML = await response.text();
+            results.style.opacity = '1';
+            e.target.value = '';
+        });
+        
+        document.getElementById('limit').addEventListener('change', function() {
+            const query = document.getElementById('query');
+            if (query.value.trim()) {
+                htmx.trigger(query, 'keyup');
+            }
+        });
     </script>
 </body>
 </html>

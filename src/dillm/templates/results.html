@@ -16,12 +16,13 @@
         align-items: baseline;
         margin-bottom: 0.5rem;
     }
-    .result-id {
+    .result-symbol {
         font-family: 'SF Mono', Monaco, monospace;
-        font-size: 0.85rem;
-        color: #888;
+        font-size: 0.95rem;
+        color: #e0e0e0;
+        font-weight: 500;
     }
-    .result-file {
+    .result-location {
         font-family: 'SF Mono', Monaco, monospace;
         font-size: 0.8rem;
         color: #68a;
@@ -31,13 +32,15 @@
         color: #6a6;
     }
     .result-snippet {
-        color: #ccc;
-        font-size: 0.9rem;
+        color: #999;
+        font-size: 0.85rem;
+        font-family: 'SF Mono', Monaco, monospace;
         line-height: 1.4;
         overflow: hidden;
         display: -webkit-box;
         -webkit-line-clamp: 3;
         -webkit-box-orient: vertical;
+        white-space: pre-wrap;
     }
     .no-results {
         text-align: center;
@@ -51,6 +54,11 @@
         padding: 1rem;
         color: #6a6;
     }
+    .ingest-success .details {
+        margin-top: 0.5rem;
+        font-size: 0.85rem;
+        color: #8a8;
+    }
 </style>
 
 {% if ingested %}
@@ -59,20 +67,36 @@
 </div>
 {% elif ingested_file %}
 <div class="ingest-success">
-    Ingested {{ ingested_count }} functions from {{ ingested_file }}
+    Ingested {{ ingested_count }} symbols from {{ ingested_file }}
+    {% if duplicates %}
+    <div class="details">
+        Skipped {{ duplicates|length }} duplicate(s): {{ duplicates.keys()|list|join(', ') }}
+    </div>
+    {% endif %}
 </div>
 {% elif results %}
     {% for result in results %}
-    <div class="result" data-id="{{ result.id }}" data-content="{{ result.content | e }}" onclick="showDocument(this.dataset.id, this.dataset.content)">
+    <div class="result" 
+         data-symbol="{{ result.symbol_name or result.id[:12] }}"
+         data-location="{{ result.filename }}:{{ result.start_line }}-{{ result.end_line }}"
+         data-content="{{ result.content | e }}" 
+         onclick="showDocument(this.dataset.symbol, this.dataset.location, this.dataset.content)">
         <div class="result-header">
-            {% if result.filename %}
-            <span class="result-file">{{ result.filename }}:{{ result.start_line }}-{{ result.end_line }}</span>
-            {% else %}
-            <span class="result-id">{{ result.id[:12] }}...</span>
+            <div>
+                {% if result.symbol_name %}
+                <span class="result-symbol">{{ result.symbol_name }}</span>
+                <span class="result-location">{{ result.filename }}:{{ result.start_line }}</span>
+                {% elif result.filename %}
+                <span class="result-location">{{ result.filename }}:{{ result.start_line }}-{{ result.end_line }}</span>
+                {% else %}
+                <span class="result-location">{{ result.id[:12] }}...</span>
+                {% endif %}
+            </div>
+            {% if result.similarity is defined %}
+            <span class="result-score">{{ "%.1f"|format(result.similarity * 100) }}%</span>
             {% endif %}
-            <span class="result-score">{{ "%.2f"|format(result.similarity * 100) }}%</span>
         </div>
-        <div class="result-snippet">{{ result.snippet }}</div>
+        <div class="result-snippet">{{ result.snippet if result.snippet else (result.content[:200] ~ '...' if result.content|length > 200 else result.content) }}</div>
     </div>
     {% endfor %}
 {% elif query %}
